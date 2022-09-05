@@ -450,6 +450,14 @@ private:
                             AudioFlinger() ANDROID_API;
     ~AudioFlinger() override;
 
+public:
+    status_t    setAppVolume(const String8& packageName, const int uid, const float value);
+    status_t    setAppMute(const String8& packageName, const int uid, const bool mute);
+    status_t    listAppVolumes(std::vector<media::AppVolume> *vols);
+
+private:
+    std::map<std::pair<String8, int>, media::AppVolume>  mAppVolumeConfigs;
+
     // call in any IAudioFlinger method that accesses mPrimaryHardwareDev
     status_t initCheck() const { return mPrimaryHardwareDev == NULL ?
                                                         NO_INIT : NO_ERROR; }

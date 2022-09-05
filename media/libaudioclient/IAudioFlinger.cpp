@@ -336,6 +336,30 @@ status_t AudioFlingerClientAdapter::getMasterBalance(float* balance) const{
     return statusTFromBinderStatus(mDelegate->getMasterBalance(balance));
 }
 
+status_t AudioFlingerClientAdapter::setAppVolume(const String8& packageName,
+        const int uid, const float value) {
+    std::string packageNameAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_String8_string(packageName));
+    return mDelegate->setAppVolume(packageNameAidl, uid, value).transactionError();
+}
+
+status_t AudioFlingerClientAdapter::setAppMute(const String8& packageName,
+        const int uid, const bool mute) {
+    std::string packageNameAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_String8_string(packageName));
+    return mDelegate->setAppMute(packageNameAidl, uid, mute).transactionError();
+}
+
+status_t AudioFlingerClientAdapter::listAppVolumes(std::vector<media::AppVolume>* vols) {
+    std::vector<media::AppVolumeData> aidlRet;
+    RETURN_STATUS_IF_ERROR(mDelegate->listAppVolumes(&aidlRet).transactionError());
+    if (vols != nullptr) {
+        *vols = VALUE_OR_RETURN_STATUS(
+            convertContainer<std::vector<media::AppVolume>>(aidlRet, media::aidl2legacy_AppVolume));
+    }
+    return OK;
+}
+
 status_t AudioFlingerClientAdapter::setStreamVolume(audio_stream_type_t stream, float value,
                                                     audio_io_handle_t output) {
     AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
@@ -1023,6 +1047,28 @@ Status AudioFlingerServerAdapter::setMasterBalance(float balance) {
 
 Status AudioFlingerServerAdapter::getMasterBalance(float* _aidl_return) {
     return Status::fromStatusT(mDelegate->getMasterBalance(_aidl_return));
+}
+
+Status AudioFlingerServerAdapter::setAppVolume(const std::string& packageName,
+        const int uid, const float value) {
+    String8 packageNameLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_string_view_String8(packageName));
+    return Status::fromStatusT(mDelegate->setAppVolume(packageNameLegacy, uid, value));
+}
+
+Status AudioFlingerServerAdapter::setAppMute(const std::string& packageName,
+        const int uid, const bool mute) {
+    String8 packageNameLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_string_view_String8(packageName));
+    return Status::fromStatusT(mDelegate->setAppMute(packageNameLegacy, uid, mute));
+}
+
+Status AudioFlingerServerAdapter::listAppVolumes(std::vector<media::AppVolumeData>* _aidl_return) {
+    std::vector<media::AppVolume> resultLegacy;
+    RETURN_BINDER_IF_ERROR(mDelegate->listAppVolumes(&resultLegacy));
+    *_aidl_return = VALUE_OR_RETURN_BINDER(convertContainer<std::vector<media::AppVolumeData>>(
+            resultLegacy, media::legacy2aidl_AppVolume));
+    return Status::ok();
 }
 
 Status AudioFlingerServerAdapter::setStreamVolume(AudioStreamType stream, float value,

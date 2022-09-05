@@ -1002,6 +1002,10 @@ public:
     float streamVolume(audio_stream_type_t stream) const final EXCLUDES_ThreadBase_Mutex;
     void setVolumeForOutput_l(float left, float right) const final;
 
+    status_t setAppVolume(const String8& packageName, const int uid, const float value);
+    status_t setAppMute(const String8& packageName, const int uid, const bool mute);
+    void listAppVolumes(std::set<media::AppVolume> &container);
+
     sp<IAfTrack> createTrack_l(
                                 const sp<Client>& client,
                                 audio_stream_type_t streamType,

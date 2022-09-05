@@ -1129,6 +1129,17 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         if (lStatus == NO_ERROR) {
             // no risk of deadlock because AudioFlinger::mutex() is held
             audio_utils::lock_guard _dl(thread->mutex());
+
+            // set volume
+            std::pair<String8, int> trackCreatorPackage =
+                    std::make_pair(track->getPackageName(), track->getUid());
+            if (!trackCreatorPackage.first.empty() &&
+                    mAppVolumeConfigs.find(trackCreatorPackage) != mAppVolumeConfigs.end()) {
+                const media::AppVolume& config = mAppVolumeConfigs[trackCreatorPackage];
+                track->setAppVolume(config.volume);
+                track->setAppMute(config.muted);
+            }
+
             // Connect secondary outputs. Failure on a secondary output must not imped the primary
             // Any secondary output setup failure will lead to a desync between the AP and AF until
             // the track is destroyed.
@@ -2038,6 +2049,62 @@ uint32_t AudioFlinger::getInputFramesLost(audio_io_handle_t ioHandle) const
         return recordThread->getInputFramesLost();
     }
     return 0;
+}
+
+
+status_t AudioFlinger::listAppVolumes(std::vector<media::AppVolume> *vols)
+{
+    std::set<media::AppVolume> volSet;
+    audio_utils::lock_guard _l(mutex());
+    for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+        mPlaybackThreads.valueAt(i)->listAppVolumes(volSet);
+    }
+
+    vols->insert(vols->begin(), volSet.begin(), volSet.end());
+
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::setAppVolume(const String8& packageName, const int uid, const float value)
+{
+    audio_utils::lock_guard _l(mutex());
+    for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+        mPlaybackThreads.valueAt(i)->setAppVolume(packageName, uid, value);
+    }
+
+    std::pair<String8, int> p = std::make_pair(packageName, uid);
+    if (mAppVolumeConfigs.find(p) == mAppVolumeConfigs.end()) {
+        media::AppVolume vol;
+        vol.packageName = packageName;
+        vol.uid = uid;
+        vol.volume = value;
+        vol.muted = false;
+        mAppVolumeConfigs[p] = vol;
+    } else {
+        mAppVolumeConfigs[p].volume = value;
+    }
+    return NO_ERROR;
+}
+
+status_t AudioFlinger::setAppMute(const String8& packageName, const int uid, const bool mute)
+{
+    audio_utils::lock_guard _l(mutex());
+    for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
+        mPlaybackThreads.valueAt(i)->setAppMute(packageName, uid, mute);
+    }
+
+    std::pair<String8, int> p = std::make_pair(packageName, uid);
+    if (mAppVolumeConfigs.find(p) == mAppVolumeConfigs.end()) {
+        media::AppVolume vol;
+        vol.packageName = packageName;
+        vol.uid = uid;
+        vol.volume = 1.0f;
+        vol.muted = mute;
+        mAppVolumeConfigs[p] = vol;
+    } else {
+        mAppVolumeConfigs[p].muted = mute;
+    }
+    return NO_ERROR;
 }
 
 status_t AudioFlinger::setVoiceVolume(float value)
